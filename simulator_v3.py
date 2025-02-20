@@ -204,7 +204,7 @@ def display_result(result, simulator):
         if len(result['samples']) < 2:
             raise ValueError("Insufficient samples for density estimation")
             
-        fig, ax = plt.subplots(figsize=(10, 1))
+        fig, ax = plt.subplots(figsize=(10, .5))
         x = np.linspace(0, 100, 500)
         kde = stats.gaussian_kde(result['samples'] * 100, bw_method=0.15)
         density = kde(x)
