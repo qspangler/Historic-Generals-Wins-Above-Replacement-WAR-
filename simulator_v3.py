@@ -97,18 +97,18 @@ def main():
     st.set_page_config(page_title="Military Strategy Simulator", layout="wide")
     set_custom_css()
     
-    # Enhanced Sidebar Navigation
     with st.sidebar:
         st.title("Historic General Comparison")
         page = st.radio(
             "Navigation Menu",
-            ["Head to Head Simulation", "About"],
-            label_visibility="collapsed",
-
+            ["Head to Head Simulation", "General Comparison", "About"],
+            label_visibility="collapsed"
         )
     
     if page == "Head to Head Simulation":
         render_simulation_page()
+    elif page == "General Comparison":
+        render_comparison_page()
     elif page == "About":
         render_about_page()
 
@@ -155,6 +155,194 @@ def render_simulation_page():
                     display_result(result, simulator)
                 except Exception as e:
                     st.error(f"Simulation failed: {str(e)}")
+
+def render_comparison_page():
+    @st.cache_resource
+    def load_simulator():
+        try:
+            return MilitarySimulator("all_battle_war.csv")
+        except Exception as e:
+            st.error(f"Error loading data: {str(e)}")
+            return None
+
+    st.title("⚔️ Historic General Comparison")
+    st.subheader("Select two generals to compare their career statistics")
+    
+    simulator = load_simulator()
+    if not simulator:
+        return
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        general1 = st.selectbox(
+            "Select General 1",
+            simulator.all_generals,
+            format_func=lambda x: f"{x} ({sim_attrs(x, simulator)})",
+            key="general1"
+        )
+    
+    with col2:
+        general2 = st.selectbox(
+            "Select General 2",
+            [g for g in simulator.all_generals if g != general1],
+            format_func=lambda x: f"{x} ({sim_attrs(x, simulator)})",
+            key="general2"
+        )
+
+    if general1 and general2:
+        st.divider()
+        
+        # Get base statistics
+        stats1 = simulator.general_stats.loc[simulator.general_stats['General'] == general1].iloc[0]
+        stats2 = simulator.general_stats.loc[simulator.general_stats['General'] == general2].iloc[0]
+        
+        # Calculate battle outcomes
+        def get_outcomes(general):
+            outcomes = simulator.df[simulator.df['General'] == general]['Outcome'].value_counts()
+            return outcomes.get('V', 0), outcomes.get('D', 0), outcomes.get('I', 0)
+        
+        v1, d1, i1 = get_outcomes(general1)
+        v2, d2, i2 = get_outcomes(general2)
+        
+        # Create comparison data
+        metrics = ["Total Battles", "Record (V-D-I)", "Total WAR", "Avg WAR/Battle"]
+        comparison_data = {
+            "Metric": metrics,
+            general1: [
+                stats1['battles'],
+                f"{v1}-{d1}-{i1}",
+                np.round(stats1['adj_lvb'],2),
+                np.round(stats1['avg_lvb'],2)
+            ],
+            general2: [
+                stats2['battles'],
+                f"{v2}-{d2}-{i2}",
+                np.round(stats2['adj_lvb'],2),
+                np.round(stats2['avg_lvb'],2)
+            ]
+        }
+
+        # Create combined dataframe
+        df = pd.DataFrame(comparison_data).set_index('Metric')
+        
+        # Create separate dataframes for display
+        df1 = df[[general1]].reset_index()
+        df2 = df[[general2]].reset_index()
+
+        # Highlighting functions
+        def highlight_gen1(row):
+            styles = [''] * len(row)
+            metric = row['Metric']
+            if metric == "Record (V-D-I)":
+                return styles
+            try:
+                val1 = float(row[general1])
+                val2 = float(df.loc[metric, general2])
+                if val1 > val2:
+                    styles[1] = 'background-color: #e6f5d0'
+            except:
+                pass
+            return styles
+
+        def highlight_gen2(row):
+            styles = [''] * len(row)
+            metric = row['Metric']
+            if metric == "Record (V-D-I)":
+                return styles
+            try:
+                val2 = float(row[general2])
+                val1 = float(df.loc[metric, general1])
+                if val2 > val1:
+                    styles[1] = 'background-color: #e6f5d0'
+            except:
+                pass
+            return styles
+
+        # Apply styling
+         # Apply styling with larger fonts
+    styled_df1 = df1.style \
+        .apply(highlight_gen1, axis=1) \
+        .set_properties(**{
+            'font-size': '20px',
+            'padding': '15px',
+            'border': '2px solid #f0f0f0'
+        }) \
+        .set_table_styles([{
+            'selector': 'th',
+            'props': [
+                ('font-size', '22px'),
+                ('background-color', '#f8f8f8'),
+                ('font-weight', 'bold'),
+                ('padding', '15px')
+            ]
+        }, {
+            'selector': 'td',
+            'props': [
+                ('font-size', '20px')
+            ]
+        }])
+
+    styled_df2 = df2.style \
+        .apply(highlight_gen2, axis=1) \
+        .set_properties(**{
+            'font-size': '20px',
+            'padding': '15px',
+            'border': '2px solid #f0f0f0'
+        }) \
+        .set_table_styles([{
+            'selector': 'th',
+            'props': [
+                ('font-size', '22px'),
+                ('background-color', '#f8f8f8'),
+                ('font-weight', 'bold'),
+                ('padding', '15px')
+            ]
+        }, {
+            'selector': 'td',
+            'props': [
+                ('font-size', '20px')
+            ]
+        }])
+
+    # Display formatted comparison
+    st.markdown("### Comparative Battle Statistics")
+    col_a, col_b = st.columns(2)
+    
+    with col_a:
+        st.markdown(f"<h3 style='font-size: 26px;'>{general1}</h3>", unsafe_allow_html=True)
+        st.dataframe(
+            styled_df1,
+            use_container_width=True,
+            hide_index=True,
+            height=400  # Taller table
+        )
+        
+    with col_b:
+        st.markdown(f"<h3 style='font-size: 26px;'>{general2}</h3>", unsafe_allow_html=True)
+        st.dataframe(
+            styled_df2,
+            use_container_width=True,
+            hide_index=True,
+            height=400  # Taller table
+        )
+
+    # Update metric box styling
+    st.markdown("""
+    <style>
+        .metric-box {
+            padding: 20px !important;
+            font-size: 20px !important;
+        }
+        .metric-value {
+            font-size: 22px !important;
+        }
+        .metric-diff {
+            font-size: 20px !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+
 
 def render_about_page():
     st.title("About the Military Strategy Simulator")
@@ -205,85 +393,199 @@ def set_custom_css():
     st.markdown("""
     <style>
         /* Base styles */
-        html, body, .stApp { font-size: 18px; }
-        h1 { font-size: 2.6rem !important; color:white; }
-        h2 { font-size: 2rem !important; color:white;}
-        h3 { font-size: 1.7rem !important;color:white; }
+        html, body, .stApp { 
+            font-size: 18px;
+            color: #2c3e50;
+        }
         
-        /* Sidebar enhancements */
+        /* Main content headers */
+        h1, h2, h3, h4, h5, h6 {
+            color: #000000 !important;
+        }
+
+        /* Sidebar container */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #000000 0%, #222222 100%) !important;
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%) !important;
+            padding: 25px !important;
         }
-        .stRadio [role="radiogroup"] {
-            gap: 12px;
-            margin-top: 20px;
-        }
-                
-        .stRadio label[data-baseweb="radio"] {
-            padding: 15px 25px !important;
-            border-radius: 8px !important;
-            background: #ffffff10 !important;
-            transition: all 0.3s !important;
-            font-size: 18px !important;
-            border: 1px solid #ffffff20 !important;
-            color: white;
-        }
-        .stRadio label[data-baseweb="radio"]:hover {
-            background: #FF00000 !important;
-            transform: translateX(5px);
-            color:white;
-        }
-        .stRadio [data-baseweb="radio"]:has(input:checked) {
-            background: #FF00000 !important;
-            border-color: #FFFFFF !important;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            color:white;
-        }
-        .stRadio [type="radio"] {
-            opacity: 0;
-            position: absolute;
-        }
-        
-        /* Component overrides */
-        .stMultiSelect [data-baseweb=select] span { 
-            font-size: 1.15rem !important;
-            padding: 8px !important;
-        }
-        [data-testid="stMetricLabel"] { font-size: 1.3rem !important; }
-        [data-testid="stMetricValue"] { font-size: 2rem !important; }
-        .stDataFrame { font-size: 1.05rem !important; }
-        .stButton button { 
-            font-size: 1.3rem !important;
-            padding: 12px 24px !important;
-            color:white;
-        }
-        [data-testid="stExpander"] .streamlit-expanderHeader { 
-            font-size: 1.4rem !important;
-        }
-        .stProgress > div > div > div { 
-            font-size: 1.05rem !important;
-        }
-                
-     /* Base styles for main content */
-        h1, h2, h3 { 
-            color: #000000 !important;  /* Black text for main content headers */
-        }
-        
-        /* Sidebar-specific styles */
+
+        /* Sidebar headers */
         [data-testid="stSidebar"] h1,
         [data-testid="stSidebar"] h2,
         [data-testid="stSidebar"] h3 {
-            color: white !important;  /* White text only for sidebar headers */
+            color: white !important;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
 
-        /* Previous sidebar styles remain unchanged */
-        [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #000000 0%, #222222 100%) !important;
+        /* Navigation radio buttons */
+        [data-testid="stSidebar"] .stRadio {
+            margin-top: 40px !important;
         }
         
+        [data-testid="stSidebar"] .stRadio label {
+            color: white !important;
+            font-size: 20px !important;
+            padding: 18px 25px !important;
+            border: 2px solid rgba(255,255,255,0.3) !important;
+            margin: 10px 0 !important;
+            border-radius: 12px !important;
+            transition: all 0.3s ease !important;
+            background: rgba(255,255,255,0.05) !important;
+        }
+
+        [data-testid="stSidebar"] .stRadio label:hover {
+            background: rgba(255,255,255,0.15) !important;
+            transform: translateX(10px);
+            border-color: rgba(255,255,255,0.6) !important;
+        }
+
+        [data-testid="stSidebar"] .stRadio label:has(input:checked) {
+            background: rgba(255,255,255,0.2) !important;
+            border-color: #FFFFFF !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        /* Table styling */
+        .stDataFrame {
+            font-size: 18px !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        }
+
+        .stDataFrame th {
+            font-size: 20px !important;
+            background-color: #f8f9fa !important;
+        }
+
+        .stDataFrame td {
+            font-size: 18px !important;
+            padding: 15px !important;
+        }
+
+        /* Buttons and inputs */
+        .stButton button {
+            font-size: 18px !important;
+            padding: 12px 24px !important;
+            color: white !important;
+        }
+
+        .stMultiSelect [data-baseweb=select] span {
+            font-size: 16px !important;
+            padding: 10px !important;
+        }
+
+        /* Metrics */
+        [data-testid="stMetricLabel"] {
+            font-size: 16px !important;
+        }
+
+        [data-testid="stMetricValue"] {
+            font-size: 24px !important;
+        }
+                
+
+        /* Base sidebar styling */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%) !important;
+        }
+
+        /* Navigation radio buttons - Transparent version */
+        [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {
+            background: transparent !important;
+            border: none !important;
+        }
+
+        [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
+            background: transparent !important;
+            border: 2px solid rgba(255,255,255,0.3) !important;
+            margin: 10px 0 !important;
+            border-radius: 12px !important;
+            transition: all 0.3s ease !important;
+            backdrop-filter: blur(2px); /* Optional: Adds subtle frosted glass effect */
+        }
+
+        [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label span {
+            color: white !important;
+            font-size: 20px !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:hover {
+            background: rgba(255,255,255,0.1) !important;
+            transform: translateX(10px);
+            border-color: rgba(255,255,255,0.6) !important;
+        }
+
+        [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:has(input:checked) {
+            background: rgba(255,255,255,0.15) !important;
+            border-color: #FFFFFF !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        /* Main content headers */
+        h1, h2, h3 {
+            color: #000000 !important;
+        }
+        
+        /* Explicit white text in sidebar */
         [data-testid="stSidebar"] * {
             color: white !important;
         }
+
+                
+     /* Base styles */
+        html, body, .stApp { 
+            font-size: 18px;
+            color: #2c3e50;
+        }
+        
+        /* Main content headers */
+        h1, h2, h3 {
+            color: #000000 !important;
+        }
+
+        /* Sidebar container */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%) !important;
+        }
+
+        /* Sidebar headers */
+        [data-testid="stSidebar"] h1 {
+            color: white !important;
+            font-size: 32px !important;
+            margin-bottom: 20px !important;
+        }
+
+        /* Navigation radio buttons */
+        [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {
+            gap: 12px;
+        }
+
+        [data-testid="stSidebar"] .stRadio label {
+            padding: 15px 25px !important;
+            border-radius: 8px !important;
+            background: rgba(255,255,255,0.1) !important;
+            border: 1px solid rgba(255,255,255,0.3) !important;
+            transition: all 0.3s ease !important;
+            color: white !important;
+        }
+
+        [data-testid="stSidebar"] .stRadio label:hover {
+            background: rgba(255,255,255,0.2) !important;
+            transform: translateX(10px);
+            border-color: rgba(255,255,255,0.6) !important;
+        }
+
+        [data-testid="stSidebar"] .stRadio label:has(input:checked) {
+            background: rgba(255,255,255,0.3) !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        [data-testid="stSidebar"] .stRadio label span {
+            color: white !important;
+            font-size: 18px !important;
+        }
+    
     </style>
     """, unsafe_allow_html=True)
 
