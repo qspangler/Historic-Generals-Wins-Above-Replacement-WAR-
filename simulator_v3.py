@@ -121,7 +121,8 @@ def render_simulation_page():
             st.error(f"Error loading data: {str(e)}")
             return None
 
-    st.title("🎯 Military Strategy Simulator - Head to Head Battle")
+    st.title("🎯 Military Strategy Head to Head Simulator")
+    st.subheader('test')
     simulator = load_simulator()
     
     if not simulator:
