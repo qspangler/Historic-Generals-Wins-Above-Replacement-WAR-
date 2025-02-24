@@ -51,7 +51,7 @@ class MilitarySimulator:
 
         stats['adj_lvb'] = stats.apply(self._bayesian_adjustment, axis=1)
         stats['lvb_std'] = stats.apply(
-            lambda x: 1/(x['battles'] + 3),  # Simplified uncertainty model
+            lambda x: 1/(x['battles'] + 3),
             axis=1
         )
         return stats
@@ -61,7 +61,6 @@ class MilitarySimulator:
         return (row['avg_lvb'] * row['battles'] + global_avg * 3) / (row['battles'] + 3)
 
     def _sample_team_strength(self, generals, n_samples=10000):
-        """Monte Carlo sampling of team strength with uncertainty"""
         if not generals:
             return np.zeros(n_samples)
             
@@ -77,7 +76,6 @@ class MilitarySimulator:
         return samples * era_mult * coalition_mult
 
     def simulate_battle(self, team_a, team_b, n_samples=10000):
-        """Returns battle outcome with Monte Carlo samples"""
         a_samples = self._sample_team_strength(team_a, n_samples)
         b_samples = self._sample_team_strength(team_b, n_samples)
         
@@ -99,6 +97,22 @@ def main():
     st.set_page_config(page_title="Military Strategy Simulator", layout="wide")
     set_custom_css()
     
+    # Enhanced Sidebar Navigation
+    with st.sidebar:
+        st.title("Historic General Comparison")
+        page = st.radio(
+            "Navigation Menu",
+            ["Head to Head Simulation", "About"],
+            label_visibility="collapsed",
+
+        )
+    
+    if page == "Head to Head Simulation":
+        render_simulation_page()
+    elif page == "About":
+        render_about_page()
+
+def render_simulation_page():
     @st.cache_resource
     def load_simulator():
         try:
@@ -107,14 +121,12 @@ def main():
             st.error(f"Error loading data: {str(e)}")
             return None
 
-    st.sidebar.title("Navigation")
+    st.title("🎯 Military Strategy Simulator - Head to Head Battle")
     simulator = load_simulator()
     
     if not simulator:
         return
         
-    st.title("🎯 Military Strategy Simulator")
-    
     col1, col2 = st.columns(2)
     with col1:
         team_a = st.multiselect(
@@ -143,13 +155,95 @@ def main():
                 except Exception as e:
                     st.error(f"Simulation failed: {str(e)}")
 
+def render_about_page():
+    st.title("About the Military Strategy Simulator")
+    st.markdown("""
+    ## Project Overview
+    This interactive military strategy simulator uses historical battle data and statistical modeling 
+    to predict hypothetical combat outcomes between military forces led by different commanders.
+    
+    ### Key Features
+    - **Monte Carlo Simulation**: Uses 10,000 iterations for probability modeling
+    - **Bayesian Adjustment**: Incorporates global averages to stabilize estimates
+    - **Historical Context**: Adjusts for era-specific combat effectiveness
+    - **Coalition Dynamics**: Models command structure complexities
+    
+    ## Data Sources
+    Analysis based on comprehensive military history records including:
+    - Historical battle outcomes
+    - Commander performance metrics
+    - Force composition data
+    - Geographical and temporal context
+    
+    ## Methodology
+    The model calculates Leadership Value Battles (LVB) scores using:
+    \[ \text{Adjusted LVB} = \frac{(\text{Observed LVB} \times \text{Battles}) + (\text{Global Avg} \times 3)}{\text{Battles} + 3} \]
+                
+    ## Data
+    Data used in this app are sourced from a project done by Ethan Arsht in 2017, an overview of which can be found here: https://medium.com/towards-data-science/napoleon-was-the-best-general-ever-and-the-math-proves-it-86efed303eeb.\n
+    Data files can be found a public Google Drive provided by Arsht in his article, linked here: https://drive.google.com/drive/folders/1nQM9eJKjp4T8EeqkSGitZS7kiok5zwJ2
+    
+    """)
+
+    with st.expander("Technical Specifications"):
+        st.markdown("""
+        ### System Architecture
+        - **Backend**: Python 3.10+ with NumPy/SciPy stack
+        - **Frontend**: Streamlit web framework
+        - **Data Processing**: Pandas for ETL pipelines
+        - **Visualization**: Matplotlib with custom military-themed palettes
+        
+        ### Statistical Models
+        - Bayesian hierarchical regression
+        - Gaussian kernel density estimation
+        - 95% confidence interval calculation
+        - Era-specific effectiveness multipliers
+        """)
+
 def set_custom_css():
     st.markdown("""
     <style>
+        /* Base styles */
         html, body, .stApp { font-size: 18px; }
-        h1 { font-size: 2.6rem !important; }
-        h2 { font-size: 2rem !important; }
-        h3 { font-size: 1.7rem !important; }
+        h1 { font-size: 2.6rem !important; color:white; }
+        h2 { font-size: 2rem !important; color:white;}
+        h3 { font-size: 1.7rem !important;color:white; }
+        
+        /* Sidebar enhancements */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #000000 0%, #222222 100%) !important;
+        }
+        .stRadio [role="radiogroup"] {
+            gap: 12px;
+            margin-top: 20px;
+        }
+                
+        .stRadio label[data-baseweb="radio"] {
+            padding: 15px 25px !important;
+            border-radius: 8px !important;
+            background: #ffffff10 !important;
+            transition: all 0.3s !important;
+            font-size: 18px !important;
+            border: 1px solid #ffffff20 !important;
+            color: white;
+        }
+        .stRadio label[data-baseweb="radio"]:hover {
+            background: #FF00000 !important;
+            transform: translateX(5px);
+            color:white;
+        }
+        .stRadio [data-baseweb="radio"]:has(input:checked) {
+            background: #FF00000 !important;
+            border-color: #FFFFFF !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            color:white;
+        }
+        .stRadio [type="radio"] {
+            opacity: 0;
+            position: absolute;
+        }
+        
+        /* Component overrides */
         .stMultiSelect [data-baseweb=select] span { 
             font-size: 1.15rem !important;
             padding: 8px !important;
@@ -160,12 +254,34 @@ def set_custom_css():
         .stButton button { 
             font-size: 1.3rem !important;
             padding: 12px 24px !important;
+            color:white;
         }
         [data-testid="stExpander"] .streamlit-expanderHeader { 
             font-size: 1.4rem !important;
         }
         .stProgress > div > div > div { 
             font-size: 1.05rem !important;
+        }
+                
+     /* Base styles for main content */
+        h1, h2, h3 { 
+            color: #000000 !important;  /* Black text for main content headers */
+        }
+        
+        /* Sidebar-specific styles */
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3 {
+            color: white !important;  /* White text only for sidebar headers */
+        }
+
+        /* Previous sidebar styles remain unchanged */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #000000 0%, #222222 100%) !important;
+        }
+        
+        [data-testid="stSidebar"] * {
+            color: white !important;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -182,7 +298,6 @@ def display_result(result, simulator):
     ci_low = result['ci_low'] * 100
     ci_high = result['ci_high'] * 100
     
-    # Victory Probability Display
     col_probs = st.columns([1, 2, 1])
     with col_probs[1]:
         st.markdown(f"""
@@ -199,12 +314,11 @@ def display_result(result, simulator):
         </div>
         """, unsafe_allow_html=True)
 
-    # Contour Visualization with Error Handling
     try:
         if len(result['samples']) < 2:
             raise ValueError("Insufficient samples for density estimation")
             
-        fig, ax = plt.subplots(figsize=(10, .5))
+        fig, ax = plt.subplots(figsize=(10, 1))
         x = np.linspace(0, 100, 500)
         kde = stats.gaussian_kde(result['samples'] * 100, bw_method=0.15)
         density = kde(x)
@@ -223,37 +337,23 @@ def display_result(result, simulator):
     except ValueError as e:
         st.warning("Could not generate density plot: " + str(e))
 
-    # Individual bar charts
     st.divider()
     
     prob_a = result['probability_a'] * 100
     prob_b = 100 - prob_a
 
-    # Modified Probability Visualization with Dual Axis
     fig, ax = plt.subplots(figsize=(10, 2))
-    
-    # Create main bars
     ax.barh(['A'], [prob_a/100], color='#2ecc71', height=0.6)
     ax.barh(['B'], [prob_b/100], color='#e74c3c', height=0.6)
-    
-    # Set axis limits
     ax.set_xlim(0, 1)
-    
-    # Create mirrored top axis
     ax2 = ax.twiny()
     ax2.set_xlim(ax.get_xlim()[::-1])
-    
-    # Format axes
     ax.set_xticks(np.linspace(0, 1, 6))
     ax.set_xticklabels([f"{x:.0f}%" for x in np.linspace(0, 100, 6)])
     ax2.set_xticks(np.linspace(0, 1, 6))
     ax2.set_xticklabels([f"{x:.0f}%" for x in np.linspace(100, 0, 6)])
-    
-    # Axis labels
     ax.set_xlabel("Side A Victory Probability", labelpad=15, fontsize=12)
     ax2.set_xlabel("Side B Victory Probability", labelpad=15, fontsize=12)
-    
-    # Remove y-axis and borders
     ax.set_yticks([])
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -261,17 +361,14 @@ def display_result(result, simulator):
     ax2.spines['top'].set_visible(False)
     ax2.spines['right'].set_visible(False)
     ax2.spines['left'].set_visible(False)
-    
     st.pyplot(fig)
 
-    # Strength Metrics
     col_strength = st.columns(2)
     with col_strength[0]:
         st.metric("Side A Strength Score", f"{result['strength_a']:.2f}")
     with col_strength[1]:
         st.metric("Side B Strength Score", f"{result['strength_b']:.2f}")
 
-    # Detailed Analysis
     with st.expander("📊 Detailed Battle Analysis", expanded=True):
         col_teams = st.columns(2)
         with col_teams[0]:
