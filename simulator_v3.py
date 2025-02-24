@@ -122,7 +122,7 @@ def render_simulation_page():
             return None
 
     st.title("🎯 Military Strategy Head to Head Simulator")
-    st.subheader('test')
+    st.subheader('Add Generals from history to either side, and see how the hypothetical opposing sides stack up based on historic Wins Above Replacement.')
     simulator = load_simulator()
     
     if not simulator:
